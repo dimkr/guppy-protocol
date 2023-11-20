@@ -1,0 +1,47 @@
+# The Guppy Protocol
+
+```
+         ..                       .;,,;,';.
+     .,xO0K0Ox;.               ..;;:::;,:,;,;
+   .ck0KKKKKKK0kc.            .';::';,',','''.
+  'd0KKKKKKKKKK0KOo.         ':cc;,''''''''''.
+ ,xKKKKKKKKKKKKK00KOd,       .::,,'''''..''.'..........
+,xKKKKKKKKKKKKK0kxddxd'       ......'..........................
+l0KKKKKKKKKKK0d:;;;;,','....,;;,'..................................
+l0KKKKKKKKKKOc;;;;;,,'..................................................
+c0KKKKKKKKK0c;;;;;,,'...................................................''..
+:OKKKKKKKKKx;;;;;,,,..................................................';;,;;'...
+;kKKKKKKKKKk;,,,,,,,..................................................,:. .:;..
+'xKKKKKKKKK0x;;,,,,,...................................................;c:c,'
+.o0KKKKKKKKKKk:,,,,,'..........................................'..........
+ 'okO000000OOOxc:;,'..   ......................................''......
+                                      ...........................
+                                       .................
+                                     lkdc:....
+                                    cOkxo.
+                                      '
+```
+
+Guppy is a simple protocol for quick transfer of small documents, inspired by Gemini, Spartan, Gopher and TFTP. In a nutshell, it's Gemini without TLS and some status codes, over UDP.
+
+=> guppy-spec.gmi Protocol specification
+
+Servers:
+
+=> https://github.com/dimkr/tootik tootik
+=> guppys.c Sample server in C
+=> guppys.py Sample server in Python
+
+Clients:
+
+=> https://github.com/MasterQ32/kristall Kristall (since b2fac23)
+=> https://github.com/dimkr/gplaces gplaces (since 1.18.0)
+=> https://github.com/skyjake/lagrange/compare/dev...dimkr:lagrange:guppy?expand=1 Lagrange fork with guppy:// support
+=> guppyc1.py Sample client in Python
+=> guppyc2.py Simpler but slower sample client in Python
+
+Sites:
+
+=> guppy://guppy.000090000.xyz/
+=> guppy://hd.206267.xyz/
+=> guppy://gemini.dimakrasner.com/

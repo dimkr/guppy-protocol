@@ -1,0 +1,434 @@
+# The Guppy Protocol Specification v0.4.2
+
+## Overview
+
+Guppy is a simple unencrypted client-to-server protocol, for download of text and text-based interfaces that require upload of short input. It uses UDP and inspired by TFTP, DNS and Spartan. The goal is to design a simple, text-based protocol without Gopher's limitations that is easy to implement and can be used to host a "guplog" even on a microcontroller (like a Raspberry Pi Pico W, ESP32 or ESP8266) and serve multiple requests using a single UDP socket.
+
+Requests are always sent as a single packet, while responses can be chunked and each chunk must be acknowledged by the client. The protocol is designed for short-lived sessions that transfer small text files, therefore it doesn't allow failed downloads to be resumed, and doesn't allow upload of big chunks of data.
+
+Implementers can choose their preferred complexity vs. speed ratio. Out-of-order transmission of chunked responses should allow extremely fast transfer of small textual documents, especially if the network is reliable. However, this requires extra code complexity, memory and bandwidth in both clients and servers. Simple implementations can achieve slow but reliable TFTP-like transfers with minimal amounts of code. Out-of-order transmission doesn't matter much if the server is a blog containing small posts (that fit in one or two chunks) and the client is smart enough to display the beginning of the response while receiving the next chunks.
+
+## Changelog
+
+v0.4.2:
+* Moved sample code to separate files
+
+v0.4.1:
+* Added link to Lagrange fork with guppy:// support
+* Added C server example
+* Added list of guppy:// URLs for testing
+* Explain why not Gopher
+
+v0.4:
+* Changed status codes and added prompts to make clients easier to implement by reusing existing Gemini or Spartan code
+* Added Python server examples
+* Added link to Kristall fork with ugly guppy:// support
+
+v0.3.2:
+=> gemini://gemini.conman.org/boston/2023/10/25.1 (Response to warning by conman)
+* Define "session"
+* Add separate error handling sections
+* Add note about DoS
+* Various typo and formatting fixes
+* Add Python client samples
+
+v0.3.1:
+=> gemini://gemini.ctrl-c.club/~tjp/gl/2023-10-25-guppy-v0.3.gmi (Response to feedback from tjp)
+* Drop v0.2 leftovers
+* Increase sequence number range
+* Clarify again that support for out-of-order transmission is not a must-have
+* Clarify retransmission related stuff
+* Put examples above the ugly details to make the spec easier to understand
+
+v0.3:
+* Out-of-order packets
+* Typo fixes
+* Overview clarification
+* Clarification about minimum packet size
+
+v0.2:
+=> gemini://tilde.pink/~slondr/re-the-guppy-protocol.gmi (Response to feedback from slondr)
+* Packet sizes can go >= 512 bytes
+* Success, continuation and EOF packets now have an increasing sequence number in the header
+* Servers are allowed to re-transmit packets
+* Clients must ignore duplicate packets
+* Clients must acknowledge EOF
+* Typo and silly mistake fixes
+* Terminology section
+* Sample client and server
+
+v0.1:
+* First version
+
+## Examples
+
+### Success - Single Packet
+
+If the URL is guppy://localhost/a and the response is "# Title 1\n":
+
+```
+	> guppy://localhost/a\r\n (request)
+	< 566837578 text/gemini\r\n# Title 1\n (response)
+	> 566837578\r\n (acknowledgment)
+	< 566837579\r\n (end-of-file)
+	> 566837579\r\n (acknowledgment)
+```
+
+### Success - Single Packet with User Input
+
+If the URL is guppy://localhost/a and input is "b c":
+
+```
+	> guppy://localhost/a?b%20c\r\n
+	< 566837578 text/gemini\r\n# Title 1\n
+	> 566837578\r\n
+	< 566837579\r\n
+	> 566837579\r\n
+```
+
+### Success - Multiple Packets
+
+If the URL is guppy://localhost/a and the response is "# Title 1\nParagraph 1\n":
+
+```
+	> guppy://localhost/a\r\n
+	< 566837578 text/gemini\r\n# Title 1\n
+	> 566837578\r\n
+	< 566837579\r\nParagraph 1
+	> 566837579\r\n
+	< 566837580\r\n\n
+	> 566837580\r\n
+	< 566837581\r\n
+	> 566837581\r\n
+```
+
+### Success - Multiple Packets With Out of Order Packets
+
+If the URL is guppy://localhost/a and the response is "# Title 1\nParagraph 1\n":
+
+```
+	> guppy://localhost/a\r\n
+	< 566837578 text/gemini\r\n# Title 1\n
+	< 566837579\r\nParagraph 1
+	> 566837578\r\n
+	< 566837579\r\nParagraph 1
+	> 566837579\r\n
+	< 566837579\r\nParagraph 1
+	< 566837580\r\n\n
+	> 566837580\r\n
+	< 566837581\r\n
+	> 566837581\r\n
+```
+
+### Success - Simple Client, Sophisticated Server
+
+If the URL is guppy://localhost/a and the response is "# Title 1\nParagraph 1\n":
+
+```
+	> guppy://localhost/a\r\n
+	< 566837578 text/gemini\r\n# Title 1\n
+	< 566837579\r\nParagraph 1 (server sends packet 566837579 without waiting for the client to acknowledge 566837578)
+	> 566837578\r\n
+	< 566837579\r\nParagraph 1 (server sends packet 566837579 again because the client didn't acknowledge it)
+	< 566837580\r\n\n (server sends packet 566837580 without waiting for the client to acknowledge 566837579)
+	> 566837579\r\n
+	< 566837580\r\n\n (server sends packet 566837580 again because the client didn't acknowledge it)
+	< 566837581\r\n (server sends packet 566837581 without waiting for the client to acknowledge 566837580)
+	> 566837580\r\n
+	< 566837581\r\n (server sends packet 566837581 again because the client didn't acknowledge it)
+	> 566837581\r\n
+```
+
+### Success - Multiple Packets With Unreliable Network
+
+If the URL is guppy://localhost/a and the response is "# Title 1\nParagraph 1\n":
+
+```
+	> guppy://localhost/a\r\n
+	< 566837578 text/gemini\r\n# Title 1\n
+	> 566837578\r\n
+	< 566837578 text/gemini\r\n# Title 1\n (acknowledgement arrived after the server re-transmitted the success packet)
+	< 566837579\r\nParagraph 1
+	< 566837579\r\nParagraph 1 (first continuation packet was lost)
+	> 566837579\r\n
+	< 566837580\r\n\n
+	> 566837580\r\n
+	> 566837580\r\n (first acknowledgement packet was lost and the client re-transmitted it while waiting for a continuation or EOF packet)
+	< 566837581\r\n (server sends EOF after receiving the re-transmitted acknowledgement packet)
+	< 566837581\r\n (first EOF packet was lost while server waits for client to acknowledge EOF)
+	> 566837581\r\n
+```
+
+### Input prompt
+
+```
+	> guppy://localhost/greet\r\n
+	< 1 Your name\r\n
+	> guppy://localhost/greet?Guppy\r\n
+	< 566837578 text/gemini\r\nHello Guppy\n
+	> 566837578\r\n
+	< 566837579\r\n
+	> 566837579\r\n
+```
+
+### Redirect - Absolute URL
+
+```
+	> guppy://localhost/a\r\n
+	< 3 guppy://localhost/b\r\n
+```
+
+### Redirect - Relative URL
+
+```
+	> guppy://localhost/a\r\n
+	< 3 /b\r\n
+```
+
+### Error
+
+```
+	> guppy://localhost/search\r\n
+	< 4 No search keywords specified\r\n
+```
+
+## Terminology
+
+"Must" means a strict requirement, a rule all conformant Guppy client or server must obey.
+
+"Should" means a recommendation, something minimal clients or servers should do.
+
+"May" means a soft recommendation, something good clients or servers should do.
+
+## URLs
+
+If no port is specified in a guppy:// URL, clients and servers must fall back to 6775 ('gu').
+
+## MIME Types
+
+Interactive clients must be able to display text/plain documents.
+
+Interactive clients must be able to parse text/gemini (without the Spartan := type) documents and allow users to follow links.
+
+If encoding is unspecified via the charset parameter of the MIME type field, the client must assume it's UTF-8. Clients which support ASCII but do not support UTF-8 may render documents with replacement characters.
+
+## Download vs. Upload
+
+In Guppy, all URLs can be (theoretically) accompanied by user-provided input. The client must provide the user with means for sending a request with user-provided input, to any link line.
+
+Server authors should inform users when input is required and describe what kind of input, using the link's user-friendly description.
+
+If input is expected but not provided by the user, the server must respond with an error packet.
+
+## Security and Privacy
+
+The protocol is unencrypted, and these concerns are beyond the scope of this document.
+
+## Limits
+
+Clients and servers may restrict packet size, to allow slower but more reliable transfer.
+
+Requests (the URL plus 2 bytes for the trailing \r\n) must fit in 2048 bytes.
+
+## Packet Order
+
+Servers should transmit multiple packets at once, instead of waiting for the client to acknolwedge a packet before sending the next one.
+
+Servers may limit the number of packets awaiting acknowledgement from the client, and wait with sending of the next continuation packets until the client acknowledges some or even all unacknowledged packets.
+
+The server must not assume that lost continuation packet n does not need to be retransmitted, when packet n+1 is acknowledged by the client.
+
+Trivial clients may ignore out-of-order packets and wait for the next packet to be retransmitted if previously received but ignored, at the cost of slow transfer speeds.
+
+Clients that receive continuation or end-of-file packets in the wrong order should cache and acknowledge the packets, to prevent the server from sending them again and reduce overall transfer time.
+
+Clients may limit the number of buffered packets and keep up to x chunks of the response in memory, when the server transmits many out-of-order packets. However, clients that save a limited number of out-of-order packets must leave room for the first response packet instead of failing when many continuation packets exhaust the buffer.
+
+## Chunked Responses
+
+The server may send a chunked response, by sending one or more continuation packets.
+
+Servers must transmit responses larger than 512 bytes in chunks of at least 512 bytes. If the response is less than 512 bytes, servers must send it as one piece, without continuation packets.
+
+Clients should start displaying the response as soon as the first chunk is received.
+
+Clients must not assume that the response is split on a line boundary: a long line may be sent in multiple response packets.
+
+Clients must not assume that every response chunk contains a valid UTF-8 string: a continuation packet may end with the first byte of multi-byte sequence, while the rest of it is in the next response chunk.
+
+## Sessions
+
+Clients must use the same source port for all packets they send within one "session".
+
+Servers should associate the source address and source port combination of a request packet with a session. For example, if the server sends packet n to 1.2.3.4:9000 but 2.3.4.5:8000 acknowledges packet n, the server must not assume that 1.2.3.4:9000 has received the packet.
+
+Servers must ignore additional request packets and duplicate acknowledgement packets in each session.
+
+Servers should limit the number of active sessions, to protect themselves against denial of service.
+
+Servers should end each session on timeout, by ignoring incoming packets and not sending any packets.
+
+Servers that limit the number of active sessions and end sessions on timeout should ignore queued requests if the time they wait in the queue exceeds session timeout.
+
+## Lost Packets
+
+Clients should re-transmit request and acknowledgement packets after a while, if nothing is received from the server.
+
+If the client keeps receiving the same sucess, continuation or EOF packet, the acknowledgement packets for it were probably lost and the client must re-acknowledge it to avoid additional waste of bandwidth and allow servers that limit the number of unacknowledged packets to send the next chunk of the response.
+
+The server should re-transmit a success, continuation or EOF packet after a while, if not acknowledged by the client.
+
+Servers must ignore duplicate acknowledgement packets and additional request packets in the same session.
+
+Clients must wait for the "end of file" packet, to differentiate between timeout, a partially received response and a successfully received response.
+
+## Packet Types
+
+There are 8 packet types:
+* Request
+* Success
+* Continuation
+* End-of-file
+* Acknowledgement
+* Input prompt
+* Redirect
+* Error
+
+All packets begin with a "header", followed by \r\n.
+
+TL;DR -
+* The server responds to a request (a URL) by sending a success, input, redirect or error packet
+* A success packet consist of a sequence number, a MIME type and data
+* A continuation packet is a success packet without a MIME type
+* The end of the response is marked by a continuation packet without data (an end-of-file packet)
+* The client acknowledges every packet by sending its sequence number back to the server
+
+### Requests
+
+```
+	url\r\n
+```
+
+The query part specifies user-provided input, percent-encoded.
+
+The server must respond with a success, input prompt, redirect or error packet.
+
+### Success
+
+```
+	seq type\r\n
+	data
+```
+
+The sequence number is an arbitrary number between 6 and 2147483647 (maximum value of a signed 32-bit integer), followed by a space character (0x20 byte). Clients must not assume that the sequence number cannot begin with a digit <= 5 and confuse success packets with sequence number 39 or 41 with redirect or error packets, respectively. Servers must pick a low enough sequence number, so the sequence number of the end-of-file packet does not exceed 2147483647.
+
+The type field specifies the response MIME type and must not be empty.
+
+### Continuation
+
+```
+	seq\r\n
+	data
+```
+
+The sequence number must increase by 1 in every continuation packet.
+
+### End-of-file
+
+```
+	seq\r\n
+```
+
+The server must mark the end of the transmission by sending a continuation packet without any data, even if the response fits in a single packet.
+
+### Acknowledgement
+
+```
+	seq\r\n
+```
+
+The client must acknowledge every success, continuation or EOF packet by echoing its sequence number back to the server.
+
+### Input prompt
+
+```
+	1 prompt\r\n
+```
+
+The client must show the prompt to the user and allow the user to repeat the request, this time with the user's input.
+
+The client may remember the input prompt and ask the user for input on future access of this URL, without having to request the same URL without input first.
+
+The client may allow the user to access a URL with user-provided input even without requesting this URL once to retrieve the prompt text.
+
+### Redirect
+
+```
+	3 url\r\n
+```
+
+The URL may be relative.
+
+The client must inform the user of the redirection.
+
+The client may remember redirected URLs. The server must not assume clients don't do this.
+
+The client should limit the number of redirects during the handling of a single request.
+
+The client may forbid a series of redirects, and may prompt the user to confirm each redirect.
+
+### Error
+
+```
+	4 error\r\n
+```
+
+Clients must display the error to the user.
+
+## Response to feedback
+
+>  Using an error packet to tell the user they need to request a URL with input mixes telling the user there was an error (e.g. something broke) with an instruction to the user
+
+This is intentional: errors are for the user, not for the client. They should be human-readable.
+
+> This also means that for any URL that should accept user input, the author would need to configure the Guppy server to return an error, which is kind of onerous.
+
+Gemini servers respond with status code 1x when they expect input but none is provided. This is a similar mechanism, but without introducing a special status code requiring clients to implement the "retry the request after showing a prompt" logic.
+
+> Using an Error Packet to signify user input:
+> * user downloads gemtext
+> ...
+
+There's a missing first step here: user follows a link that says "enter search keywords" or "new post", then decides to attach input to the request.
+
+> It seems like this probably was changed but the acknowledgement section wasn't updated.
+> [...]
+> This contradicts just about everything said elsewhere about out-of-order packet handling so it probably just wasn't updated in some prior iteration.
+
+True.
+
+> Note also that with the spec-provided 512 byte minimum chunk size, storing the sequence number in an unsigned 16-bit number caps the guaranteed download size at 16MB.
+
+True. Although we're talking about small text files here, I increased the sequence number range to allow larger transfers.
+
+> One possible (but not guaranteed) ack failure indication would be receiving a re-transmission of an already-acked packet, but this is something the spec elsewhere suggests clients ignore, and is a pretty awkward heuristic to code.
+
+Clients must re-acknowledge the packet if received again, so the server can stop sending it and continue if it's waiting for it to be acknowledged before it sends the next ones.
+
+> The server won't be able to distinguish re-transmission of the "same" request packet from a legitimate re-request [...]. These are indistinguishable because request packets don't have a sequence number.
+
+The server can use the source address and port combination to ignore additional requests in the same "session", hence no application layer request ID is needed. That's one thing that UDP does provide :)
+
+> It's a classic mistake to look at complicated machinery like TCP and assume it's bloated.
+
+I'm not assuming it's bloated, and Guppy is not a reaction to the so-called "bloat" of TCP. It's an experiment in designing a protocol simpler than Gopher and Spartan, which provides a similar feature set but with faster transfer speeds (for small documents) and using a much simpler software stack (i.e. including the implementation of TCP/IP, instead of judging simplicity by the application layer protocol alone).
+
+> Even though TCP contains a more complicated and convoluted solution to the problems of re-ordering and re-transmission, its use would be a massive simplification both for this spec and especially for implementors.
+
+Implementors can implement a TFTP-style client, one that sends a request, waits for a single packet, acknowledges it, waits for the next packet and so on. If the client displays the first chunk of the response while waiting for the next one, and the document fits in 3-4 response packets, such a client should be good enough for most content and most users. Clients are compatible with servers that don't understand out-of-order transmission, and vice versa, so it is possible to implement a super simple but still useful Guppy client.
+
+> Any time you have a [...] protocol where a small packet to the server results in a large packet from the server will be exploited with a constant barrage of forged packets.
+
+True, but this sentence also applies to TCP-based protcols. In general, any server exposed to the internet without any kind of rate limiting or load balancing will get DoSed or abused. For example, a TFTP server can limit the number of source addresses, source ports or address+port combinations it's willing to talk to at a given moment, and I don't see why the same concept can't be applied to a Guppy server.
+
+In addition, unlike some UDP-based protocols, where both the request and the response are a single UDP packet, Guppy has the end-of-file packet even in pages that fit in one chunk: the server knows the "session" hasn't ended until the client acks this packet, so the server can count and limit active sesions. Please correct me if I'm wrong.
