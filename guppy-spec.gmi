@@ -1,4 +1,4 @@
-# The Guppy Protocol Specification v0.4.2
+# The Guppy Protocol Specification v0.4.3
 
 ## Overview
 
