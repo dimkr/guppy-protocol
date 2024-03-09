@@ -10,6 +10,9 @@ Implementers can choose their preferred complexity vs. speed ratio. Out-of-order
 
 ## Changelog
 
+v0.4.3:
+* Removed download vs. upload, obsolete since v0.4
+
 v0.4.2:
 * Moved sample code to separate files
 
@@ -211,14 +214,6 @@ Interactive clients must be able to display text/plain documents.
 Interactive clients must be able to parse text/gemini (without the Spartan := type) documents and allow users to follow links.
 
 If encoding is unspecified via the charset parameter of the MIME type field, the client must assume it's UTF-8. Clients which support ASCII but do not support UTF-8 may render documents with replacement characters.
-
-## Download vs. Upload
-
-In Guppy, all URLs can be (theoretically) accompanied by user-provided input. The client must provide the user with means for sending a request with user-provided input, to any link line.
-
-Server authors should inform users when input is required and describe what kind of input, using the link's user-friendly description.
-
-If input is expected but not provided by the user, the server must respond with an error packet.
 
 ## Security and Privacy
 
