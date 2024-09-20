@@ -34,9 +34,9 @@ Servers:
 
 Clients:
 
+=> https://gmi.skyjake.fi/lagrange/ Lagrange (since 1.18.0)
 => https://github.com/MasterQ32/kristall Kristall (since b2fac23)
 => https://github.com/dimkr/gplaces gplaces (since 1.18.0)
-=> https://github.com/skyjake/lagrange/compare/dev...dimkr:lagrange:guppy?expand=1 Lagrange fork with guppy:// support
 => guppyc1.py Sample client in Python
 => guppyc2.py Simpler but slower sample client in Python
 
