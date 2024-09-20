@@ -1,4 +1,4 @@
-# The Guppy Protocol Specification v0.4.3
+# The Guppy Protocol Specification v0.4.4
 
 ## Overview
 
@@ -9,6 +9,9 @@ Requests are always sent as a single packet, while responses can be chunked and 
 Implementers can choose their preferred complexity vs. speed ratio. Out-of-order transmission of chunked responses should allow extremely fast transfer of small textual documents, especially if the network is reliable. However, this requires extra code complexity, memory and bandwidth in both clients and servers. Simple implementations can achieve slow but reliable TFTP-like transfers with minimal amounts of code. Out-of-order transmission doesn't matter much if the server is a blog containing small posts (that fit in one or two chunks) and the client is smart enough to display the beginning of the response while receiving the next chunks.
 
 ## Changelog
+
+v0.4.4:
+* Relaxed the minimum chunk size requirement for large responses: >=512b chunks are recommended but not mandatory
 
 v0.4.3:
 * Removed download vs. upload, obsolete since v0.4
@@ -243,7 +246,7 @@ Clients may limit the number of buffered packets and keep up to x chunks of the 
 
 The server may send a chunked response, by sending one or more continuation packets.
 
-Servers must transmit responses larger than 512 bytes in chunks of at least 512 bytes. If the response is less than 512 bytes, servers must send it as one piece, without continuation packets.
+Servers should transmit responses larger than 512 bytes in chunks of at least 512 bytes. If the response is less than 512 bytes, servers should send it as one piece, without continuation packets.
 
 Clients should start displaying the response as soon as the first chunk is received.
 
